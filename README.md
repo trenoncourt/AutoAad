@@ -1,5 +1,5 @@
 # AutoAad
-A microservice REST API to query Azure Active Directory in .net core.
+A microservice REST API to query Azure Active Directory in .net core 2.0.
 
 If you want to query Azure Active Directory easily with application right. Just drop this api on a server, configure and that's it!
 
