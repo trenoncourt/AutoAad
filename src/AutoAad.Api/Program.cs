@@ -62,11 +62,17 @@ namespace AutoAad.Api
                     app.ConfigureCors(_appSettings);
                     app.Run(async context =>
                     {
+                        if (!context.Request.Path.HasValue)
+                        {
+                            context.Response.StatusCode = 404;
+                            return;
+                        }
+
                         if (_token == null || _token.ExpireDate <= DateTime.UtcNow)
                         {
                             // Get the token if first time or expired
                             // TODO add redis store instead of static variable
-                            HttpResponseMessage response = await $"{_appSettings.AzureAd.Instance}{_appSettings.AzureAd.Domain}/oauth2/v2.0/token"
+                            HttpResponseMessage tknResponse = await $"{_appSettings.AzureAd.Instance}{_appSettings.AzureAd.Domain}/oauth2/v2.0/token"
                                 .AllowHttpStatus("4xx")
                                 .SendUrlEncodedAsync(HttpMethod.Post, new
                                 {
@@ -76,17 +82,17 @@ namespace AutoAad.Api
                                     scope = $"{_appSettings.AzureAd.Resource}.default"
                                 }).ConfigureAwait(false);
 
-                            if (!response.IsSuccessStatusCode)
+                            if (!tknResponse.IsSuccessStatusCode)
                             { // If the response is not success return the stream.
-                                context.Response.StatusCode = (int)response.StatusCode;
-                                Stream responseBufferStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                                context.Response.ContentType = "application/json";
+                                context.Response.StatusCode = (int)tknResponse.StatusCode;
+                                Stream responseBufferStream = await tknResponse.Content.ReadAsStreamAsync().ConfigureAwait(false);
                                 await responseBufferStream.CopyToAsync(context.Response.Body).ConfigureAwait(false);
                                 return;
                             }
 
-                            using (Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                            using (Stream stream = await tknResponse.Content.ReadAsStreamAsync().ConfigureAwait(false))
                             {
-                                var serializer = new JsonSerializer();
                                 using (var sr = new StreamReader(stream))
                                 {
                                     string json = await sr.ReadLineAsync().ConfigureAwait(false);
@@ -95,7 +101,17 @@ namespace AutoAad.Api
                                 }
                             }
                         }
-//                        var t = $"{_appSettings.AzureAd.Resource}{_appSettings.AzureAd.GraphVersion}";
+                        
+                        HttpResponseMessage resourceResponse = await $"{_appSettings.AzureAd.Resource}{_appSettings.AzureAd.GraphVersion}{context.Request.Path.Value}{context.Request.QueryString.Value ?? ""}"
+                            .WithOAuthBearerToken(_token.AccessToken)
+                            .GetAsync()
+                            .ConfigureAwait(false);
+                        
+                        context.Response.ContentType = "application/json";
+                        context.Response.StatusCode = (int)resourceResponse.StatusCode;
+                        Stream resourceResponseBufferStream = await resourceResponse.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                        await resourceResponseBufferStream.CopyToAsync(context.Response.Body).ConfigureAwait(false);
+                        return;
                     });
                 })
                 .Build();
