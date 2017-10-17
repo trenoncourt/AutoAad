@@ -97,7 +97,7 @@ namespace AutoAad.Api
                                 {
                                     string json = await sr.ReadLineAsync().ConfigureAwait(false);
                                     TokenResponse tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(json);
-                                    _token = new Token { AccessToken = tokenResponse.AccessToken, ExpireDate = DateTime.UtcNow.AddMinutes(tokenResponse.ExpireInMinutes) };
+                                    _token = new Token { AccessToken = tokenResponse.AccessToken, ExpireDate = DateTime.UtcNow.AddSeconds(tokenResponse.ExpireInMinutes) };
                                 }
                             }
                         }
